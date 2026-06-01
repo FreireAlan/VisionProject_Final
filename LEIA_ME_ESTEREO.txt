@@ -1,0 +1,22 @@
+Arquivos corrigidos para a etapa de visão estéreo.
+
+Alterações principais:
+1. StereoCaptureActivity.java
+   - Campo de baseline explicitado como deslocamento lateral POS1-POS2 em cm.
+   - Campo separado para distância real do objeto em cm.
+   - Aviso se baseline for maior que 20 cm.
+
+2. StereoProcessingActivity.java
+   - Botões para três presets de StereoSGBM:
+     Preset 1: 64 disparidades | bloco 5
+     Preset 2: 128 disparidades | bloco 7
+     Preset 3: 192 disparidades | bloco 9
+   - Ao processar, o relatório registra a tabela comparativa dos três presets.
+
+3. StereoDepthActivity.java
+   - Texto explicando que a distância real informada em T2 é usada para erro absoluto e relativo.
+
+4. StereoUtils.java
+   - Salva mapas disparity_preset_1.jpg, disparity_preset_2.jpg e disparity_preset_3.jpg.
+   - Aplica medianBlur 5x5 como pós-processamento T7.
+   - Calcula erro absoluto e relativo entre Z mediano e distância real do objeto.
