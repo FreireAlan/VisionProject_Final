@@ -5,6 +5,7 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -23,6 +24,7 @@ import androidx.core.content.ContextCompat;
 
 import com.google.common.util.concurrent.ListenableFuture;
 
+import org.opencv.android.Utils;
 import org.opencv.calib3d.Calib3d;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
@@ -48,6 +50,7 @@ public class CalibrationActivity extends AppCompatActivity {
     private static final int MIN_IMAGES = 20;
 
     private PreviewView previewView;
+    private ImageView chessboardOverlayView;
     private TextView status;
     private ImageView beforeView;
     private ImageView afterView;
@@ -77,10 +80,15 @@ public class CalibrationActivity extends AppCompatActivity {
         LinearLayout root = Ui.vertical(this);
         root.setPadding(16, 32, 16, 16);
 
-        status = Ui.text(this, "Atividade 4: imprima tabuleiro 9x6 cantos internos, quadrado 25 mm.");
+        status = Ui.text(this, "Atividade 4: imprima tabuleiro 9x6 cantos internos, quadrado 25 mm. Ao detectar, o app desenha os cantos/linhas coloridas sobre o tabuleiro.");
 
         previewView = new PreviewView(this);
         previewView.setScaleType(PreviewView.ScaleType.FILL_CENTER);
+
+        chessboardOverlayView = new ImageView(this);
+        chessboardOverlayView.setAdjustViewBounds(false);
+        chessboardOverlayView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        chessboardOverlayView.setBackgroundColor(0x00000000);
 
         beforeView = new ImageView(this);
         beforeView.setAdjustViewBounds(true);
@@ -114,6 +122,16 @@ public class CalibrationActivity extends AppCompatActivity {
             }
         });
 
+        FrameLayout previewContainer = new FrameLayout(this);
+        previewContainer.addView(previewView, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+        ));
+        previewContainer.addView(chessboardOverlayView, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+        ));
+
         LinearLayout pair = new LinearLayout(this);
         pair.setOrientation(LinearLayout.HORIZONTAL);
         pair.addView(beforeView, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f));
@@ -121,7 +139,7 @@ public class CalibrationActivity extends AppCompatActivity {
 
         root.addView(Ui.title(this, "Atividade 4 — Calibração"));
         root.addView(status);
-        root.addView(previewView, new LinearLayout.LayoutParams(
+        root.addView(previewContainer, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
         root.addView(toggleAuto);
         root.addView(calibrate);
@@ -210,7 +228,10 @@ public class CalibrationActivity extends AppCompatActivity {
 
             if (!found) {
                 stableCount = 0;
-                runOnUiThread(() -> status.setText(statusLine("Tabuleiro não detectado.")));
+                runOnUiThread(() -> {
+                    chessboardOverlayView.setImageBitmap(null);
+                    status.setText(statusLine("Tabuleiro não detectado."));
+                });
                 return;
             }
 
@@ -228,6 +249,8 @@ public class CalibrationActivity extends AppCompatActivity {
                     criteria
             );
 
+            Bitmap annotatedBitmap = drawDetectedChessboard(bgr, pattern, corners, true);
+
             double movement = movementFromPrevious(corners);
             previousCorners = new MatOfPoint2f(corners.toArray());
 
@@ -244,15 +267,19 @@ public class CalibrationActivity extends AppCompatActivity {
                 stableCount = 0;
 
                 runOnUiThread(() -> {
+                    chessboardOverlayView.setImageBitmap(annotatedBitmap);
                     Toast.makeText(this, "Imagem de calibração aceita.", Toast.LENGTH_SHORT).show();
                     status.setText(statusLine("Tabuleiro detectado e estável. Imagem aceita."));
                 });
             } else {
-                runOnUiThread(() -> status.setText(statusLine(
-                        "Tabuleiro detectado. Movimento médio="
-                                + String.format("%.2f", movement)
-                                + " px | estável=" + stableCount + "/4"
-                )));
+                runOnUiThread(() -> {
+                    chessboardOverlayView.setImageBitmap(annotatedBitmap);
+                    status.setText(statusLine(
+                            "Tabuleiro detectado. Movimento médio="
+                                    + String.format("%.2f", movement)
+                                    + " px | estável=" + stableCount + "/4"
+                    ));
+                });
             }
         } catch (Exception e) {
             runOnUiThread(() -> status.setText("Erro na detecção: " + e.getMessage()));
@@ -260,6 +287,29 @@ public class CalibrationActivity extends AppCompatActivity {
             if (bgr != null) bgr.release();
             if (gray != null) gray.release();
             corners.release();
+        }
+    }
+
+
+    private Bitmap drawDetectedChessboard(Mat bgr, Size pattern, MatOfPoint2f corners, boolean found) {
+        Mat annotated = null;
+        Mat rgb = null;
+        try {
+            annotated = bgr.clone();
+
+            // Desenha a malha de cantos detectados, semelhante à visualização do PDF/OpenCV.
+            // As linhas/pontos aparecem somente quando o padrão 9x6 é encontrado.
+            Calib3d.drawChessboardCorners(annotated, pattern, corners, found);
+
+            rgb = new Mat();
+            Imgproc.cvtColor(annotated, rgb, Imgproc.COLOR_BGR2RGB);
+
+            Bitmap bitmap = Bitmap.createBitmap(rgb.cols(), rgb.rows(), Bitmap.Config.ARGB_8888);
+            Utils.matToBitmap(rgb, bitmap);
+            return bitmap;
+        } finally {
+            if (annotated != null) annotated.release();
+            if (rgb != null) rgb.release();
         }
     }
 

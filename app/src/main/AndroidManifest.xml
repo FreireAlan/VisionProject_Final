@@ -19,6 +19,9 @@
         android:label="@string/app_name"
         android:supportsRtl="true">
 
+        <activity android:name=".StereoDepthActivity" android:screenOrientation="portrait" />
+        <activity android:name=".StereoProcessingActivity" android:screenOrientation="portrait" />
+        <activity android:name=".StereoCaptureActivity" android:screenOrientation="portrait" />
         <activity android:name=".CalibrationActivity" android:screenOrientation="portrait" />
         <activity android:name=".ModeloCameraActivity" android:screenOrientation="portrait" />
         <activity android:name=".ProcessActivity" android:screenOrientation="portrait" />
